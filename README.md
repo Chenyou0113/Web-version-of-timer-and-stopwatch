@@ -50,10 +50,6 @@ CSS3 (Tailwind CSS)：快速建立響應式和美觀的介面。
 
 JavaScript：實現碼表、倒數計時邏輯、動畫和主題切換功能。
 
-預覽
-
-
-apps.apple.com
 貢獻
 歡迎任何形式的貢獻！如果您有任何建議、功能請求或發現錯誤，請隨時提出 Issue 或提交 Pull Request。
  
