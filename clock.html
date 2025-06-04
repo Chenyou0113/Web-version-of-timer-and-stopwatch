@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>碼表與倒數計時器</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定義字體為 Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f4f8; /* 淺色背景 */
+        }
+        /* 隱藏數字輸入框的上下箭頭 (雖然已移除 input[type="number"], 但保留以防萬一) */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        /* 深色模式樣式 */
+        html.dark {
+            background-color: #1a202c; /* 深色背景 */
+        }
+        html.dark .bg-white {
+            background-color: #2d3748; /* 深色卡片背景 */
+        }
+        html.dark .text-gray-800,
+        html.dark .text-gray-900 {
+            color: #e2e8f0; /* 淺色文字 */
+        }
+        html.dark .bg-gray-50 {
+            background-color: #4a5568; /* 深色碼表顯示區背景 */
+            border-color: #6a7280; /* 深色邊框 */
+        }
+        html.dark .text-gray-600 {
+            color: #a0aec0; /* 淺色單位文字 */
+        }
+        html.dark .bg-gray-100 {
+            background-color: #2d3748; /* 深色功能列背景 */
+        }
+        html.dark .text-gray-700 {
+            color: #e2e8f0; /* 深色模式下功能列按鈕文字 */
+        }
+        html.dark .hover\:bg-gray-200:hover {
+            background-color: #4a5568; /* 深色模式下功能列按鈕 hover 效果 */
+        }
+        html.dark .bg-blue-50 {
+            background-color: #2c5282; /* 深色倒數計時設定區背景 */
+            border-color: #4299e1; /* 深色倒數計時設定區邊框 */
+        }
+        html.dark .text-blue-800 {
+            color: #bee3f8; /* 深色倒數計時設定區文字 */
+        }
+        html.dark .border-gray-300 {
+            border-color: #4a5568; /* 深色輸入框邊框 */
+        }
+        html.dark .text-center {
+            color: #e2e8f0; /* 深色輸入框文字 */
+        }
+        html.dark .focus\:ring-blue-500:focus {
+            --tw-ring-color: #63b3ed; /* 深色模式下輸入框 focus ring */
+        }
+        /* 新增的深色模式樣式 for arrows */
+        html.dark .arrow-button {
+            color: #90cdf4; /* Light blue for arrows in dark mode */
+        }
+        html.dark .arrow-button:hover {
+            color: #bee3f8;
+        }
+        html.dark .selected-input {
+            border-color: #63b3ed; /* Highlight color for selected input in dark mode */
+            box-shadow: 0 0 0 2px rgba(99, 179, 237, 0.75); /* Ring effect */
+        }
+        html.dark #currentTimeDisplay {
+            color: #e2e8f0; /* 深色模式下當前時間顯示文字 */
+        }
+
+        /* 數字彈跳動畫 */
+        .digit-pop {
+            animation: pop-digit 0.3s ease-out;
+        }
+
+        @keyframes pop-digit {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; } /* 稍微放大更多 */
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 啟動時的整體放大動畫 */
+        .initial-magnify {
+            animation: initial-magnify-animation 0.5s ease-out;
+        }
+
+        @keyframes initial-magnify-animation {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; } /* 稍微放大整個顯示區 */
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">碼表與倒數計時器</h1>
+
+        <!-- 功能列 -->
+        <div class="flex justify-center mb-8 bg-gray-100 p-2 rounded-lg">
+            <button id="showStopwatchButton" class="flex-1 py-2 px-4 rounded-md text-lg font-semibold transition duration-300 ease-in-out mr-2 bg-blue-600 text-white shadow-md">
+                碼表
+            </button>
+            <button id="showCountdownButton" class="flex-1 py-2 px-4 rounded-md text-lg font-semibold transition duration-300 ease-in-out ml-2 text-gray-700 hover:bg-gray-200">
+                倒數計時
+            </button>
+        </div>
+
+        <!-- 碼表模式區塊 -->
+        <div id="stopwatchSection">
+            <!-- 碼表顯示區 -->
+            <div id="timerDisplay" class="flex justify-center items-baseline text-center mb-8 p-4 bg-gray-50 rounded-lg border-2 border-gray-200">
+                <div class="flex flex-col items-center mx-1">
+                    <span id="displayHours" class="text-6xl font-mono text-gray-900">00</span>
+                    <span class="text-sm text-gray-600">小時</span>
+                </div>
+                <span class="text-6xl font-mono text-gray-900 mx-1">:</span>
+                <div class="flex flex-col items-center mx-1">
+                    <span id="displayMinutes" class="text-6xl font-mono text-gray-900">00</span>
+                    <span class="text-sm text-gray-600">分鐘</span>
+                </div>
+                <span class="text-6xl font-mono text-gray-900 mx-1">:</span>
+                <div class="flex flex-col items-center mx-1">
+                    <span id="displaySeconds" class="text-6xl font-mono text-gray-900">00</span>
+                    <span class="text-sm text-gray-600">秒</span>
+                </div>
+                <span class="text-6xl font-mono text-gray-900 mx-1">.</span>
+                <div class="flex flex-col items-center mx-1">
+                    <span id="displayMilliseconds" class="text-4xl font-mono text-gray-900">00</span> <!-- 毫秒顯示兩位數字 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 倒數計時模式區塊 -->
+        <div id="countdownSection" class="hidden">
+            <!-- 倒數計時設定區 -->
+            <div class="mb-8 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                <div class="flex justify-center items-center space-x-2 mb-4">
+                    <!-- 小時輸入區 -->
+                    <div class="flex flex-col items-center">
+                        <button class="arrow-button text-xl font-bold text-blue-600 hover:text-blue-800" data-unit="hours" data-action="increment">▲</button>
+                        <span id="countdownHoursDisplay" class="w-16 p-4 border border-gray-300 rounded-md text-center text-lg cursor-pointer countdown-input-display">00</span>
+                        <button class="arrow-button text-xl font-bold text-blue-600 hover:text-blue-800" data-unit="hours" data-action="decrement">▼</button>
+                    </div>
+                    <span class="text-2xl font-bold">:</span>
+                    <!-- 分鐘輸入區 -->
+                    <div class="flex flex-col items-center">
+                        <button class="arrow-button text-xl font-bold text-blue-600 hover:text-blue-800" data-unit="minutes" data-action="increment">▲</button>
+                        <span id="countdownMinutesDisplay" class="w-16 p-4 border border-gray-300 rounded-md text-center text-lg cursor-pointer countdown-input-display">00</span>
+                        <button class="arrow-button text-xl font-bold text-blue-600 hover:text-blue-800" data-unit="minutes" data-action="decrement">▼</button>
+                    </div>
+                    <span class="text-2xl font-bold">:</span>
+                    <!-- 秒輸入區 -->
+                    <div class="flex flex-col items-center">
+                        <button class="arrow-button text-xl font-bold text-blue-600 hover:text-blue-800" data-unit="seconds" data-action="increment">▲</button>
+                        <span id="countdownSecondsDisplay" class="w-16 p-4 border border-gray-300 rounded-md text-center text-lg cursor-pointer countdown-input-display">00</span>
+                        <button class="arrow-button text-xl font-bold text-blue-600 hover:text-blue-800" data-unit="seconds" data-action="decrement">▼</button>
+                    </div>
+                </div>
+
+                <!-- 數字小鍵盤已移除 -->
+                <!-- <div id="keypad" class="grid grid-cols-3 gap-2 mt-4 hidden">
+                    <button class="keypad-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out" data-digit="1">1</button>
+                    <button class="keypad-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out" data-digit="2">2</button>
+                    <button class="keypad-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out" data-digit="3">3</button>
+                    <button class="keypad-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out" data-digit="4">4</button>
+                    <button class="keypad-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out" data-digit="5">5</button>
+                    <button class="keypad-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out" data-digit="6">6</button>
+                    <button class="keypad-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out" data-digit="7">7</button>
+                    <button class="keypad-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out" data-digit="8">8</button>
+                    <button class="keypad-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out" data-digit="9">9</button>
+                    <button id="clearKeypad" class="keypad-button bg-red-400 hover:bg-red-500 text-white font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out">C</button>
+                    <button class="keypad-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out" data-digit="0">0</button>
+                    <button id="backspaceKeypad" class="keypad-button bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-3 rounded-lg shadow-sm transition duration-150 ease-in-out">←</button>
+                </div> -->
+            </div>
+        </div>
+
+
+        <!-- 控制按鈕區 -->
+        <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <button id="toggleStartPauseButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75">
+                開始
+            </button>
+            <button id="resetButton" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75">
+                重設
+            </button>
+        </div>
+    </div>
+
+    <!-- 淺色/深色模式切換按鈕 -->
+    <button id="themeToggleButton" class="fixed bottom-4 right-4 bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-4 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75">
+        🌙
+    </button>
+
+    <script>
+        // 獲取 DOM 元素
+        const timerDisplay = document.getElementById('timerDisplay');
+        const displayHours = document.getElementById('displayHours');
+        const displayMinutes = document.getElementById('displayMinutes');
+        const displaySeconds = document.getElementById('displaySeconds');
+        const displayMilliseconds = document.getElementById('displayMilliseconds');
+
+        const toggleStartPauseButton = document.getElementById('toggleStartPauseButton'); // 合併後的開始/暫停按鈕
+        const resetButton = document.getElementById('resetButton');
+
+        // 新的倒數計時顯示元素
+        const countdownHoursDisplay = document.getElementById('countdownHoursDisplay');
+        const countdownMinutesDisplay = document.getElementById('countdownMinutesDisplay');
+        const countdownSecondsDisplay = document.getElementById('countdownSecondsDisplay');
+
+        const stopwatchSection = document.getElementById('stopwatchSection');
+        const countdownSection = document.getElementById('countdownSection');
+        const showStopwatchButton = document.getElementById('showStopwatchButton');
+        const showCountdownButton = document.getElementById('showCountdownButton');
+        const themeToggleButton = document.getElementById('themeToggleButton');
+
+        // const keypad = document.getElementById('keypad'); // 已移除
+        // const clearKeypadButton = document.getElementById('clearKeypad'); // 已移除
+        // const backspaceKeypadButton = document.getElementById('backspaceKeypad'); // 已移除
+
+        let startTime; // 記錄碼表或倒數計時器開始的時間戳
+        let elapsedTime = 0; // 記錄碼表已過的時間（毫秒）
+        let countdownTotalDuration = 0; // 倒數計時器設定的總時間（毫秒）
+        let countdownRemainingAtPause = 0; // 倒數計時器暫停時的剩餘時間（毫秒）
+        let countdownTargetTime; // 倒數計時器結束的目標時間戳
+        let timerInterval; // 儲存 setInterval 的 ID，用於清除碼表
+        let isRunning = false; // 標記碼表是否正在運行
+        let mode = 'stopwatch'; // 'stopwatch' 或 'countdown'，預設為碼表模式
+
+        // 數字小鍵盤相關變數 (已移除相關功能，但保留變數以防萬一)
+        let activeInputSpan = null; // 預設沒有選中任何輸入框
+        let currentInputString = ''; // 用於構建數字輸入
+
+        /**
+         * 更新碼表顯示的內容（小時、分鐘、秒、毫秒），並觸發數字動畫
+         * @param {number} milliseconds - 要顯示的總毫秒數
+         */
+        function updateDisplayContent(milliseconds) {
+            const totalSeconds = Math.floor(milliseconds / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            const ms = milliseconds % 1000;
+
+            // 獲取舊的顯示值
+            const oldHours = displayHours.textContent;
+            const oldMinutes = displayMinutes.textContent;
+            const oldSeconds = displaySeconds.textContent;
+            const oldMilliseconds = displayMilliseconds.textContent;
+
+            // 格式化新的顯示值
+            const newHours = String(hours).padStart(2, '0');
+            const newMinutes = String(minutes).padStart(2, '0');
+            const newSeconds = String(seconds).padStart(2, '0');
+            const newMilliseconds = String(Math.floor(ms / 10)).padStart(2, '0');
+
+            // 比較並更新，如果數字改變則觸發動畫
+            if (oldHours !== newHours) {
+                displayHours.textContent = newHours;
+                displayHours.classList.add('digit-pop');
+                setTimeout(() => displayHours.classList.remove('digit-pop'), 300); // 動畫持續時間
+            }
+            if (oldMinutes !== newMinutes) {
+                displayMinutes.textContent = newMinutes;
+                displayMinutes.classList.add('digit-pop');
+                setTimeout(() => displayMinutes.classList.remove('digit-pop'), 300);
+            }
+            if (oldSeconds !== newSeconds) {
+                displaySeconds.textContent = newSeconds;
+                displaySeconds.classList.add('digit-pop');
+                setTimeout(() => displaySeconds.classList.remove('digit-pop'), 300);
+            }
+            if (oldMilliseconds !== newMilliseconds) {
+                displayMilliseconds.textContent = newMilliseconds;
+                displayMilliseconds.classList.add('digit-pop');
+                setTimeout(() => displayMilliseconds.classList.remove('digit-pop'), 300);
+            }
+        }
+
+        /**
+         * 更新碼表顯示（碼表模式）
+         */
+        function updateStopwatch() {
+            const currentTime = Date.now();
+            elapsedTime = currentTime - startTime;
+            updateDisplayContent(elapsedTime);
+        }
+
+        /**
+         * 更新碼表顯示（倒數計時模式）
+         */
+        function updateCountdown() {
+            let currentRemaining = countdownTargetTime - Date.now();
+
+            if (currentRemaining <= 0) {
+                currentRemaining = 0;
+                clearInterval(timerInterval);
+                isRunning = false;
+                updateDisplayContent(0); // 確保顯示為 00:00:00.000
+                displayMessage("時間到！", true); // 顯示時間到的訊息，自動隱藏
+                // 重置按鈕狀態和倒數計時變數
+                toggleStartPauseButton.textContent = '開始'; // 重設為開始
+                toggleStartPauseButton.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+                toggleStartPauseButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                countdownTotalDuration = 0; // 清除總時間
+                countdownRemainingAtPause = 0; // 清除已運行的時間
+                return;
+            }
+            updateDisplayContent(currentRemaining);
+        }
+
+        /**
+         * 切換開始/暫停狀態
+         */
+        function toggleStartPause() {
+            if (!isRunning) {
+                // 從停止或暫停狀態開始
+                if (mode === 'stopwatch') {
+                    startTime = Date.now() - elapsedTime; // 從上次停止的時間點繼續
+                    timerInterval = setInterval(updateStopwatch, 10);
+                } else { // countdown mode
+                    // 檢查是否沒有設定時間或倒數已結束
+                    if (countdownTotalDuration <= 0 && countdownRemainingAtPause <= 0) {
+                        displayMessage("請先設定倒數時間！", true);
+                        return;
+                    }
+                    if (countdownRemainingAtPause <= 0) { // 如果剩餘時間為0，表示已經倒數完畢
+                         displayMessage("倒數已結束，請重設！", true);
+                         return;
+                    }
+                    // 設置倒數目標時間：當前時間 + 暫停時的剩餘時間
+                    countdownTargetTime = Date.now() + countdownRemainingAtPause;
+                    timerInterval = setInterval(updateCountdown, 10);
+
+                    // 新增：啟動時的整體放大動畫
+                    timerDisplay.classList.add('initial-magnify');
+                    setTimeout(() => {
+                        timerDisplay.classList.remove('initial-magnify');
+                    }, 500); // 動畫持續時間
+                }
+                isRunning = true;
+                toggleStartPauseButton.textContent = '暫停';
+                toggleStartPauseButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+                toggleStartPauseButton.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+                hideMessage(); // 開始計時時隱藏任何提示訊息
+            } else {
+                // 從運行狀態暫停
+                clearInterval(timerInterval); // 清除碼表
+                isRunning = false;
+                if (mode === 'stopwatch') {
+                    elapsedTime = Date.now() - startTime; // 記錄當前已逝時間
+                } else { // countdown mode
+                    // 記錄當前剩餘時間
+                    countdownRemainingAtPause = countdownTargetTime - Date.now();
+                }
+                toggleStartPauseButton.textContent = '開始';
+                toggleStartPauseButton.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+                toggleStartPauseButton.classList.add('bg-green-600', 'hover:bg-green-700');
+            }
+        }
+
+        /**
+         * 重設碼表或倒數計時器
+         */
+        function resetTimer() {
+            clearInterval(timerInterval);
+            elapsedTime = 0; // 重設碼表已逝時間
+            countdownTotalDuration = 0; // 重設倒數總時間
+            countdownRemainingAtPause = 0; // 重設倒數暫停時的剩餘時間
+            isRunning = false;
+
+            if (mode === 'stopwatch') {
+                updateDisplayContent(0);
+            } else { // countdown mode
+                // 重設倒數計時輸入顯示為 00:00:00
+                countdownHoursDisplay.textContent = '00';
+                countdownMinutesDisplay.textContent = '00';
+                countdownSecondsDisplay.textContent = '00';
+                updateDisplayContent(0); // 主顯示區也歸零
+                // 重設鍵盤輸入狀態 (已移除鍵盤，所以此處無實際作用)
+                currentInputString = '';
+                // hideKeypad(); // 已移除鍵盤，無需隱藏
+            }
+            toggleStartPauseButton.textContent = '開始'; // 重設按鈕文字和顏色
+            toggleStartPauseButton.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+            toggleStartPauseButton.classList.add('bg-green-600', 'hover:bg-green-700');
+            hideMessage(); // 隱藏時間到訊息
+        }
+
+        /**
+         * 設定倒數計時時間
+         * 此函數現在只負責根據輸入框的值更新內部變數 `countdownTotalDuration` 和 `countdownRemainingAtPause`。
+         */
+        function setCountdown() {
+            const hours = parseInt(countdownHoursDisplay.textContent) || 0;
+            const minutes = parseInt(countdownMinutesDisplay.textContent) || 0;
+            const seconds = parseInt(countdownSecondsDisplay.textContent) || 0;
+
+            countdownTotalDuration = (hours * 3600 + minutes * 60 + seconds) * 1000;
+            countdownRemainingAtPause = countdownTotalDuration; // 設定新時間時，剩餘時間等於總時間
+            updateDisplayContent(countdownTotalDuration); // 更新主顯示區的內容
+        }
+
+        /**
+         * 顯示訊息（例如：時間到！）
+         * @param {string} message - 要顯示的訊息
+         * @param {boolean} autoHide - 是否自動隱藏訊息
+         */
+        function displayMessage(message, autoHide = false) {
+            let messageBox = document.getElementById('messageBox');
+            if (!messageBox) {
+                messageBox = document.createElement('div');
+                messageBox.id = 'messageBox';
+                messageBox.className = 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-700 text-white p-4 rounded-lg shadow-xl z-50 text-lg font-semibold';
+                document.body.appendChild(messageBox);
+            }
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            if (autoHide) {
+                setTimeout(() => {
+                    messageBox.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        /**
+         * 隱藏訊息
+         */
+        function hideMessage() {
+            const messageBox = document.getElementById('messageBox');
+            if (messageBox) {
+                messageBox.style.display = 'none';
+            }
+        }
+
+        /**
+         * 更新模式顯示（切換碼表/倒數計時器介面）
+         */
+        function updateModeDisplay() {
+            if (mode === 'stopwatch') {
+                stopwatchSection.classList.remove('hidden');
+                countdownSection.classList.add('hidden');
+                showStopwatchButton.classList.add('bg-blue-600', 'text-white');
+                showStopwatchButton.classList.remove('text-gray-700', 'hover:bg-gray-200');
+                showCountdownButton.classList.remove('bg-blue-600', 'text-white');
+                showCountdownButton.classList.add('text-gray-700', 'hover:bg-gray-200');
+                // 重設碼表顯示
+                updateDisplayContent(elapsedTime);
+                // hideKeypad(); // 已移除鍵盤，無需隱藏
+            } else { // countdown
+                stopwatchSection.classList.add('hidden');
+                countdownSection.classList.remove('hidden');
+                showCountdownButton.classList.add('bg-blue-600', 'text-white');
+                showCountdownButton.classList.remove('text-gray-700', 'hover:bg-gray-200');
+                showStopwatchButton.classList.remove('bg-blue-600', 'text-white');
+                showStopwatchButton.classList.add('text-gray-700', 'hover:bg-gray-200');
+                // 重設倒數計時顯示
+                // 確保倒數計時輸入區的顯示與內部值同步
+                countdownHoursDisplay.textContent = String(Math.floor(countdownTotalDuration / 3600000)).padStart(2, '0');
+                countdownMinutesDisplay.textContent = String(Math.floor((countdownTotalDuration % 3600000) / 60000)).padStart(2, '0');
+                countdownSecondsDisplay.textContent = String(Math.floor((countdownTotalDuration % 60000) / 1000)).padStart(2, '0');
+                updateDisplayContent(countdownTotalDuration); // 主顯示區也更新
+                // setActiveInput(countdownHoursDisplay); // 已移除鍵盤，無需設定活動輸入框
+            }
+            // 每次切換模式時，確保碼表停止並重置按鈕狀態
+            clearInterval(timerInterval);
+            isRunning = false;
+            toggleStartPauseButton.textContent = '開始'; // 重設為開始
+            toggleStartPauseButton.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+            toggleStartPauseButton.classList.add('bg-green-600', 'hover:bg-green-700');
+            hideMessage();
+        }
+
+        /**
+         * 切換淺色/深色模式
+         */
+        function toggleTheme() {
+            const htmlElement = document.documentElement;
+            if (htmlElement.classList.contains('dark')) {
+                htmlElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                themeToggleButton.textContent = '🌙'; // 月亮圖示表示切換到深色模式
+            } else {
+                htmlElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                themeToggleButton.textContent = '☀️'; // 太陽圖示表示切換到淺色模式
+            }
+        }
+
+        /**
+         * 載入主題偏好設定
+         */
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+                themeToggleButton.textContent = '☀️';
+            } else {
+                document.documentElement.classList.remove('dark');
+                themeToggleButton.textContent = '🌙';
+            }
+        }
+
+        /**
+         * 獲取倒數計時建議 (使用 Gemini API)
+         * 此函數已移除其按鈕，但保留函數邏輯以防未來需要。
+         */
+        async function getCountdownSuggestion() {
+            const hours = parseInt(countdownHoursDisplay.textContent) || 0;
+            const minutes = parseInt(countdownMinutesDisplay.textContent) || 0;
+            const seconds = parseInt(countdownSecondsDisplay.textContent) || 0;
+
+            const totalSeconds = (hours * 3600 + minutes * 60 + seconds);
+
+            if (totalSeconds === 0) {
+                displayMessage("請先設定倒數時間才能獲取建議！", true);
+                return;
+            }
+
+            // 顯示載入訊息
+            displayMessage("正在獲取建議...", false);
+
+            try {
+                let prompt = `Given a time duration of ${hours} hours, ${minutes} minutes, and ${seconds} seconds, provide a concise and motivating suggestion for an activity or focus during this time. For example, if it's 30 minutes, suggest a quick workout or reading a chapter. Keep the suggestion to one sentence and make it in Traditional Chinese.`;
+
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+                const apiKey = ""; // Canvas 將自動提供 API key
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    displayMessage(`建議: ${text}`, false); // 顯示建議，不自動隱藏
+                } else {
+                    displayMessage("未能獲取建議，請稍後再試。", true);
+                }
+            } catch (error) {
+                console.error("Error fetching suggestion:", error);
+                displayMessage("獲取建議時發生錯誤。", true);
+            } finally {
+                // 按鈕已移除，無需啟用
+            }
+        }
+
+        // 數字小鍵盤和箭頭按鈕邏輯 (數字小鍵盤相關邏輯已移除)
+
+        /**
+         * 設定當前選中的輸入框 (僅用於高亮顯示，不涉及鍵盤)
+         * @param {HTMLElement} spanElement - 要選中的 span 元素
+         */
+        function setActiveInput(spanElement) {
+            // 移除所有輸入框的選中樣式
+            document.querySelectorAll('.countdown-input-display').forEach(span => {
+                span.classList.remove('border-blue-500', 'ring-2', 'ring-blue-500', 'selected-input');
+            });
+            // 為選中的輸入框添加樣式
+            spanElement.classList.add('border-blue-500', 'ring-2', 'ring-blue-500', 'selected-input');
+            activeInputSpan = spanElement;
+            currentInputString = activeInputSpan.textContent.replace(/^0+/, ''); // 移除前導零
+            if (currentInputString === '') currentInputString = '0'; // 如果全是零，則設為 '0'
+        }
+
+        /**
+         * 增加或減少時間單位的值
+         * @param {string} unit - 時間單位 ('hours', 'minutes', 'seconds')
+         * @param {string} action - 'increment' 或 'decrement'
+         */
+        function adjustTimeByArrow(unit, action) {
+            let targetSpan;
+            let limit;
+            let currentVal;
+
+            if (unit === 'hours') {
+                targetSpan = countdownHoursDisplay;
+                limit = 99;
+            } else if (unit === 'minutes') {
+                targetSpan = countdownMinutesDisplay;
+                limit = 59;
+            } else if (unit === 'seconds') {
+                targetSpan = countdownSecondsDisplay;
+                limit = 59;
+            } else {
+                return;
+            }
+
+            currentVal = parseInt(targetSpan.textContent);
+
+            if (action === 'increment') {
+                currentVal = (currentVal + 1) > limit ? 0 : (currentVal + 1);
+            } else if (action === 'decrement') {
+                currentVal = (currentVal - 1) < 0 ? limit : (currentVal - 1);
+            }
+
+            targetSpan.textContent = String(currentVal).padStart(2, '0');
+            setActiveInput(targetSpan); // 箭頭操作後也將該單位設為選中
+        }
+
+
+        // 監聽按鈕點擊事件
+        toggleStartPauseButton.addEventListener('click', toggleStartPause); // 合併後的按鈕事件
+        resetButton.addEventListener('click', resetTimer);
+        showStopwatchButton.addEventListener('click', () => {
+            mode = 'stopwatch';
+            updateModeDisplay();
+            resetTimer(); // 確保切換模式時重設碼表
+        });
+        showCountdownButton.addEventListener('click', () => {
+            mode = 'countdown';
+            updateModeDisplay();
+            resetTimer(); // 確保切換模式時重設碼表
+            // 在切換到倒數計時模式時，根據輸入框的當前值自動設定倒數時間
+            setCountdown();
+        });
+        themeToggleButton.addEventListener('click', toggleTheme); // 主題切換按鈕事件
+
+        // 監聽倒數計時顯示區的點擊事件，用於選中輸入目標
+        countdownHoursDisplay.addEventListener('click', () => setActiveInput(countdownHoursDisplay));
+        countdownMinutesDisplay.addEventListener('click', () => setActiveInput(countdownMinutesDisplay));
+        countdownSecondsDisplay.addEventListener('click', () => setActiveInput(countdownSecondsDisplay));
+
+        // 監聽箭頭按鈕點擊事件
+        document.querySelectorAll('.arrow-button').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const unit = event.target.dataset.unit;
+                const action = event.target.dataset.action;
+                adjustTimeByArrow(unit, action);
+                // 箭頭操作後也自動更新倒數時間
+                setCountdown();
+            });
+        });
+
+        // 監聽 document 上的點擊事件，用於在點擊外部時隱藏小鍵盤 (現在只用於取消高亮)
+        document.addEventListener('click', (event) => {
+            const isClickInsideCountdownInput = event.target.classList.contains('countdown-input-display');
+            const isClickInsideArrowButton = event.target.classList.contains('arrow-button');
+            const isClickInsideToggleStartPauseButton = toggleStartPauseButton.contains(event.target); // 確保點擊開始/暫停按鈕時不取消高亮
+            const isClickInsideResetButton = resetButton.contains(event.target); // 確保點擊重設按鈕時不取消高亮
+
+            // 檢查點擊是否在倒數計時模式下，並且點擊的目標不在倒數輸入框、箭頭按鈕、開始/暫停按鈕或重設按鈕內部
+            if (mode === 'countdown' && !isClickInsideCountdownInput && !isClickInsideArrowButton && !isClickInsideToggleStartPauseButton && !isClickInsideResetButton) {
+                // 移除所有輸入框的選中樣式
+                document.querySelectorAll('.countdown-input-display').forEach(span => {
+                    span.classList.remove('border-blue-500', 'ring-2', 'ring-blue-500', 'selected-input');
+                });
+                activeInputSpan = null; // 不再有活動輸入框
+                currentInputString = ''; // 清除輸入字串
+            }
+        });
+
+
+        // 初始化時禁用暫停按鈕並顯示碼表模式
+        updateModeDisplay(); // 首次載入時顯示碼表模式
+        loadTheme(); // 載入主題偏好設定
+        // 首次載入倒數計時模式時，預設選中小時輸入並設定倒數時間
+        if (mode === 'countdown') {
+            setActiveInput(countdownHoursDisplay); // 仍然高亮小時輸入
+            setCountdown(); // 確保倒數計時模式初始顯示正確
+        }
+    </script>
+</body>
+</html>
